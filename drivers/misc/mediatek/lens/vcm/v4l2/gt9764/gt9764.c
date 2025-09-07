@@ -153,8 +153,7 @@ static int gt9764_power_off(struct gt9764_device *gt9764)
 	if (gt9764->vcamaf_pinctrl && gt9764->vcamaf_off)
 		ret = pinctrl_select_state(gt9764->vcamaf_pinctrl,
 								   gt9764->vcamaf_off);
-
-		return ret;
+									return ret;
 }
 
 static int gt9764_power_on(struct gt9764_device *gt9764)
@@ -175,8 +174,8 @@ static int gt9764_power_on(struct gt9764_device *gt9764)
 		ret = pinctrl_select_state(gt9764->vcamaf_pinctrl,
 								   gt9764->vcamaf_on);
 
-		if (ret < 0)
-			return ret;
+	if (ret < 0)
+		return ret;
 
 	/*
 	 * TODO(b/139784289): Confirm hardware requirements and adjust/remove
