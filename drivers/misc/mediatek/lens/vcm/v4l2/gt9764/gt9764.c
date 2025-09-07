@@ -14,7 +14,7 @@
 #define DRIVER_NAME "gt9764"
 
 #define LOG_INF(format, args...)                                               \
-	pr_info(DRIVER_NAME " [%s] " format, __func__, ##args)
+pr_info(DRIVER_NAME " [%s] " format, __func__, ##args)
 
 #define GT9764_NAME				"gt9764"
 #define GT9764_MAX_FOCUS_POS			1023
@@ -36,10 +36,6 @@
  */
 #define GT9764_MOVE_STEPS			100
 #define GT9764_MOVE_DELAY_US			5000
-#if defined(PEARL_CAM)
-#define GT9764_POWERMOVE_STEPS		50
-static unsigned long g_u4setinitpos;
-#endif
 
 /* gt9764 device structure */
 struct gt9764_device {
@@ -74,7 +70,7 @@ static int gt9764_set_position(struct gt9764_device *gt9764, u16 val)
 	struct i2c_client *client = v4l2_get_subdevdata(&gt9764->sd);
 
 	return i2c_smbus_write_word_data(client, GT9764_SET_POSITION_ADDR,
-					 swab16(val));
+									 swab16(val));
 }
 
 static int gt9764_release(struct gt9764_device *gt9764)
@@ -87,27 +83,28 @@ static int gt9764_release(struct gt9764_device *gt9764)
 	diff_dac = GT9764_ORIGIN_FOCUS_POS - gt9764->focus->val;
 
 	nStep_count = (diff_dac < 0 ? (diff_dac*(-1)) : diff_dac) /
-		GT9764_MOVE_STEPS;
+	GT9764_MOVE_STEPS;
 
 	val = gt9764->focus->val;
 
 	for (i = 0; i < nStep_count; ++i) {
 		val += (diff_dac < 0 ? (GT9764_MOVE_STEPS*(-1)) : GT9764_MOVE_STEPS);
+
 		ret = gt9764_set_position(gt9764, val);
 		if (ret) {
 			LOG_INF("%s I2C failure: %d",
-				__func__, ret);
+					__func__, ret);
 			return ret;
 		}
 		usleep_range(GT9764_MOVE_DELAY_US,
-			     GT9764_MOVE_DELAY_US + 1000);
+					 GT9764_MOVE_DELAY_US + 1000);
 	}
 
 	// last step to origin
 	ret = gt9764_set_position(gt9764, GT9764_ORIGIN_FOCUS_POS);
 	if (ret) {
 		LOG_INF("%s I2C failure: %d",
-			__func__, ret);
+				__func__, ret);
 		return ret;
 	}
 
@@ -155,9 +152,9 @@ static int gt9764_power_off(struct gt9764_device *gt9764)
 
 	if (gt9764->vcamaf_pinctrl && gt9764->vcamaf_off)
 		ret = pinctrl_select_state(gt9764->vcamaf_pinctrl,
-					gt9764->vcamaf_off);
+								   gt9764->vcamaf_off);
 
-	return ret;
+		return ret;
 }
 
 static int gt9764_power_on(struct gt9764_device *gt9764)
@@ -176,10 +173,10 @@ static int gt9764_power_on(struct gt9764_device *gt9764)
 
 	if (gt9764->vcamaf_pinctrl && gt9764->vcamaf_on)
 		ret = pinctrl_select_state(gt9764->vcamaf_pinctrl,
-					gt9764->vcamaf_on);
+								   gt9764->vcamaf_on);
 
-	if (ret < 0)
-		return ret;
+		if (ret < 0)
+			return ret;
 
 	/*
 	 * TODO(b/139784289): Confirm hardware requirements and adjust/remove
@@ -193,12 +190,12 @@ static int gt9764_power_on(struct gt9764_device *gt9764)
 
 	return 0;
 
-fail:
+	fail:
 	regulator_disable(gt9764->vin);
 	regulator_disable(gt9764->vdd);
 	if (gt9764->vcamaf_pinctrl && gt9764->vcamaf_off) {
 		pinctrl_select_state(gt9764->vcamaf_pinctrl,
-				gt9764->vcamaf_off);
+							 gt9764->vcamaf_off);
 	}
 
 	return ret;
@@ -206,47 +203,6 @@ fail:
 
 static int gt9764_set_ctrl(struct v4l2_ctrl *ctrl)
 {
-#if defined(PEARL_CAM)
-	int ret, val,last_val;
-	int diff_dac= 0;
-	int nStep_count = 0;
-
-	struct gt9764_device *gt9764 = to_gt9764_vcm(ctrl);
-	diff_dac = GT9764_ORIGIN_FOCUS_POS - gt9764->focus->val;
-	nStep_count = (diff_dac < 0 ? (diff_dac*(-1)) : diff_dac) /GT9764_POWERMOVE_STEPS;
-	last_val = gt9764->focus->val;
-	if (g_u4setinitpos > 0 ){
-		LOG_INF("current diff_dac:%d,nStep_count:%d,val:%d,last_val:%d,g_u4setinitpos:%d",diff_dac,nStep_count,val,last_val,g_u4setinitpos);
-		for (int i = 0; i < nStep_count; ++i) {
-			val = GT9764_ORIGIN_FOCUS_POS + (i+1)*(diff_dac < 0 ? GT9764_POWERMOVE_STEPS :(GT9764_POWERMOVE_STEPS*(-1)));
-			ret = gt9764_set_position(gt9764, val);
-			if (ret) {
-				LOG_INF("%s I2C failure: %d",
-					__func__, ret);
-				return ret;
-			}
-			mdelay(5);
-		}
-		usleep_range(GT9764_MOVE_DELAY_US,
-					GT9764_MOVE_DELAY_US + 1000);
-		// move to last pos
-		ret = gt9764_set_position(gt9764, last_val);
-		if (ret) {
-			LOG_INF("%s I2C failure: %d",
-				__func__, ret);
-			return ret;
-		}
-		g_u4setinitpos--;
-	}else
-	{
-		ret = gt9764_set_position(gt9764, ctrl->val);
-		if (ret) {
-				LOG_INF("%s I2C failure: %d",
-					__func__, ret);
-				return ret;
-			}
-	}
-#else
 	int ret = 0;
 	struct gt9764_device *gt9764 = to_gt9764_vcm(ctrl);
 
@@ -255,11 +211,10 @@ static int gt9764_set_ctrl(struct v4l2_ctrl *ctrl)
 		ret = gt9764_set_position(gt9764, ctrl->val);
 		if (ret) {
 			LOG_INF("%s I2C failure: %d",
-				__func__, ret);
+					__func__, ret);
 			return ret;
 		}
 	}
-#endif
 	return 0;
 }
 
@@ -271,9 +226,6 @@ static int gt9764_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	int ret;
 	struct gt9764_device *gt9764 = sd_to_gt9764_vcm(sd);
-#if defined(PEARL_CAM)
-	g_u4setinitpos = 2;
-#endif
 
 	LOG_INF("%s\n", __func__);
 
@@ -308,9 +260,9 @@ static void gt9764_subdev_cleanup(struct gt9764_device *gt9764)
 {
 	v4l2_async_unregister_subdev(&gt9764->sd);
 	v4l2_ctrl_handler_free(&gt9764->ctrls);
-#if IS_ENABLED(CONFIG_MEDIA_CONTROLLER)
+	#if IS_ENABLED(CONFIG_MEDIA_CONTROLLER)
 	media_entity_cleanup(&gt9764->sd.entity);
-#endif
+	#endif
 }
 
 static int gt9764_init_controls(struct gt9764_device *gt9764)
@@ -321,7 +273,7 @@ static int gt9764_init_controls(struct gt9764_device *gt9764)
 	v4l2_ctrl_handler_init(hdl, 1);
 
 	gt9764->focus = v4l2_ctrl_new_std(hdl, ops, V4L2_CID_FOCUS_ABSOLUTE,
-			  0, GT9764_MAX_FOCUS_POS, GT9764_FOCUS_STEPS, 0);
+									  0, GT9764_MAX_FOCUS_POS, GT9764_FOCUS_STEPS, 0);
 
 	if (hdl->error)
 		return hdl->error;
@@ -352,7 +304,6 @@ static int gt9764_probe(struct i2c_client *client)
 	}
 
 	gt9764->vdd = devm_regulator_get(dev, "vdd");
-
 	if (IS_ERR(gt9764->vdd)) {
 		ret = PTR_ERR(gt9764->vdd);
 		if (ret != -EPROBE_DEFER)
@@ -393,13 +344,13 @@ static int gt9764_probe(struct i2c_client *client)
 	if (ret)
 		goto err_cleanup;
 
-#if IS_ENABLED(CONFIG_MEDIA_CONTROLLER)
+	#if IS_ENABLED(CONFIG_MEDIA_CONTROLLER)
 	ret = media_entity_pads_init(&gt9764->sd.entity, 0, NULL);
 	if (ret < 0)
 		goto err_cleanup;
 
 	gt9764->sd.entity.function = MEDIA_ENT_F_LENS;
-#endif
+	#endif
 
 	ret = v4l2_async_register_subdev(&gt9764->sd);
 	if (ret < 0)
@@ -407,7 +358,7 @@ static int gt9764_probe(struct i2c_client *client)
 
 	return 0;
 
-err_cleanup:
+	err_cleanup:
 	gt9764_subdev_cleanup(gt9764);
 	return ret;
 }
