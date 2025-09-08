@@ -116,6 +116,13 @@ void wifi_fwlog_event_func_register(wifi_fwlog_event_func_cb func)
 }
 EXPORT_SYMBOL(wifi_fwlog_event_func_register);
 
+void wifi_fwlog_get_fw_ver_register(wifi_fwlog_get_fw_ver_func_cb func)
+{
+	WIFI_INFO_FUNC("wifi_fwlog_get_fw_ver_register %p\n", func);
+	pfFwGetFwVerCB = func;
+}
+EXPORT_SYMBOL(wifi_fwlog_get_fw_ver_register);
+
 int wifi_fwlog_onoff_status(void)
 {
 	int ret = 88;
