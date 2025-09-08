@@ -9379,7 +9379,7 @@ static int get_hp_current_calibrate_val(struct mt6338_priv *priv)
 #endif
 }
 
-static int set_idac_trim_val(struct mt6338_priv *priv)
+__maybe_unused static int set_idac_trim_val(struct mt6338_priv *priv)
 {
 #if IS_ENABLED(CONFIG_MT6338_EFUSE)
 	int ret = 0;
