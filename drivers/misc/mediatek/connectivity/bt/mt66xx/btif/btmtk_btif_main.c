@@ -261,10 +261,8 @@ static int btmtk_pm_notifier_callback(struct notifier_block *nb,
 
 	switch (event) {
 		case PM_SUSPEND_PREPARE:
-			if(cif_dev->bt_state != FUNC_ON) {
-				BTMTK_INFO("%s: bt_state[%d], event[%ld]",
-						__func__, cif_dev->bt_state, event);
-			}
+			BTMTK_INFO("%s: bt_state[%d], event[%ld]",
+					__func__, cif_dev->bt_state, event);
 		case PM_POST_SUSPEND:
 			if(cif_dev->bt_state == FUNC_ON) {
 				bt_dump_bgfsys_suspend_wakeup_debug();
@@ -395,6 +393,8 @@ static int32_t btmtk_cif_fw_own_clr(void)
 
 	if (g_bt_trace_pt)
 		bt_dbg_tp_evt(TP_ACT_DRVOWN_IN, 0, 0, NULL);
+
+	REG_WRITEL(BGF_LPCTL, BGF_HOST_CLR_FW_OWN_B);
 	do {
 		/* assume wait interval 0.5ms each time,
 		 * wait maximum total 7ms to query status
@@ -402,13 +402,9 @@ static int32_t btmtk_cif_fw_own_clr(void)
 		if ((retry & 0xF) == 0) { /* retry % 16 == 0 */
 			if (((retry < LPCR_POLLING_RTY_LMT && retry >= LPCR_MASS_DUMP_LMT) || (retry == 2048) || (retry == 32)) &&
 				((retry & 0x1F) == 0)) {
-				BTMTK_WARN("[DRV_OWN] failed in %d ms, retry[%d]", (LPCR_POLLING_RTY_LMT - retry) / 2, retry);
+				BTMTK_WARN("[DRV_OWN] failed in %d ms, poll retry[%d]", (LPCR_POLLING_RTY_LMT - retry) / 2, retry);
 				bt_dump_cif_own_cr();
-				REG_WRITEL(BGF_LPCTL, BGF_HOST_CLR_FW_OWN_B);
-				BTMTK_WARN("[DRV_OWN] dump after write:");
-				bt_dump_cif_own_cr();
-			} else
-				REG_WRITEL(BGF_LPCTL, BGF_HOST_CLR_FW_OWN_B);
+			}
 		}
 
 		lpctl_cr = REG_READL(BGF_LPCTL);
@@ -456,17 +452,15 @@ static int32_t btmtk_cif_fw_own_set(void)
 
 	if (g_bt_trace_pt)
 		bt_dbg_tp_evt(TP_ACT_FWOWN_IN, 0, 0, NULL);
+
+	REG_WRITEL(BGF_LPCTL, BGF_HOST_SET_FW_OWN_B);
 	do {
 		if ((retry & 0xF) == 0) { /* retry % 16 == 0 */
 			if (((retry < LPCR_POLLING_RTY_LMT && retry >= LPCR_MASS_DUMP_LMT) || (retry == 2048) || (retry == 32)) &&
 				((retry & 0x1F) == 0)) {
-				BTMTK_WARN("[FW_OWN] failed in %d ms, retry[%d]", (LPCR_POLLING_RTY_LMT - retry) / 2, retry);
+				BTMTK_WARN("[FW_OWN] failed in %d ms, poll retry[%d]", (LPCR_POLLING_RTY_LMT - retry) / 2, retry);
 				bt_dump_cif_own_cr();
-				REG_WRITEL(BGF_LPCTL, BGF_HOST_SET_FW_OWN_B);
-				BTMTK_WARN("[FW_OWN] dump after write:");
-				bt_dump_cif_own_cr();
-			} else
-				REG_WRITEL(BGF_LPCTL, BGF_HOST_SET_FW_OWN_B);
+			}
 		}
 
 		/*
@@ -1237,7 +1231,7 @@ int32_t btmtk_wcn_btif_open(void)
  * Return Value:
  *     0 if success, otherwise error code
  */
-int32_t btmtk_wcn_btif_close(void)
+int32_t btmtk_wcn_btif_close()
 {
 	int32_t ret = 0;
 	struct btmtk_btif_dev *cif_dev = (struct btmtk_btif_dev *)g_sbdev->cif_dev;
@@ -1578,9 +1572,7 @@ static int btmtk_cif_probe(struct platform_device *pdev)
 	/* 8. Register screen on/off & suspend/wakup notify callback */
 	cif_dev->blank_state = WMT_PARA_SCREEN_ON;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
-	if (mtk_disp_notifier_register("btmtk_disp_notifier", &btmtk_disp_notifier)) {
-		BTMTK_ERR("Register mtk_disp_notifier failed\n");
-	}
+	mtk_disp_notifier_register("btmtk_disp_notifier", &btmtk_disp_notifier);
 #else
 	btmtk_fb_notify_register();
 #endif

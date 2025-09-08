@@ -65,7 +65,6 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci1
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci1/$(MTK_PLATFORM)
 else
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/platform/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
 endif
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/eemcs
@@ -89,7 +88,7 @@ ccflags-y += -I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2
 ###############################################################################
 
 
-ccflags-y += $(call cc-disable-warning,unused-but-set-variable)
+ccflags-y += -Werror $(call cc-disable-warning,unused-but-set-variable)
 
 ifeq ($(CONFIG_MTK_COMBO_CHIP_MT6628),y)
     ccflags-y += -D MT6628
@@ -190,7 +189,11 @@ ccflags-y += -DLOG_STP_DEBUG_DISABLE
 endif
 endif
 
-ccflags-y += -D WMT_DBG_SUPPORT=0
+ifneq ($(TARGET_BUILD_VARIANT), user)
+    ccflags-y += -D WMT_DBG_SUPPORT=1
+else
+    ccflags-y += -D WMT_DBG_SUPPORT=0
+endif
 
 ifeq ($(CONFIG_MTK_DEVAPC),y)
     ccflags-y += -D WMT_DEVAPC_DBG_SUPPORT=1

@@ -46,7 +46,7 @@ static struct fm_timer *fm_timer_sys;
 static struct fm_timer *fm_cqi_check_timer;
 #endif
 
-#define FM_CHIP_CAN_SUSPEND 0x00006627
+#define FM_CHIP_CAN_SUSPEND 0x00006631
 FM_WAKE_LOCK_T *fm_wake_lock;
 
 static bool scan_stop_flag; /* false */
@@ -2456,6 +2456,8 @@ struct fm *fm_dev_init(unsigned int arg)
 		goto ERR_EXIT;
 	}
 
+	g_fm_struct = fm;
+
 	fm->timer_wkthd = fm_workthread_create("fm_timer_wq");
 
 	if (!fm->timer_wkthd) {
@@ -2560,8 +2562,6 @@ struct fm *fm_dev_init(unsigned int arg)
 /* fm_timer_sys->start(fm_timer_sys); */
 	fm_cust_config_setting();
 
-	g_fm_struct = fm;
-
 	return g_fm_struct;
 
 ERR_EXIT:
@@ -2628,12 +2628,6 @@ ERR_EXIT:
 	if (fm->pstRDSData) {
 		fm_free(fm->pstRDSData);
 		fm->pstRDSData = NULL;
-	}
-
-	if (fm->rds_event) {
-		ret = fm_flag_event_put(fm->rds_event);
-		if (!ret)
-			fm->rds_event = NULL;
 	}
 
 	fm_free(fm);

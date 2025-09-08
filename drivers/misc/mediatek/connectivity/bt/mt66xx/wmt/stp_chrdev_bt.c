@@ -55,7 +55,7 @@ static struct device *stpbt_dev;
 static UINT8 i_buf[BT_BUFFER_SIZE]; /* Input buffer for read */
 static UINT8 o_buf[BT_BUFFER_SIZE]; /* Output buffer for write */
 
-static struct semaphore wr_mtx, rd_mtx, bt_on_mtx;
+static struct semaphore wr_mtx, rd_mtx;
 static struct wakeup_source *bt_wakelock;
 /* Wait queue for poll and read */
 static wait_queue_head_t inq;
@@ -113,40 +113,17 @@ void bthost_debug_init(void)
 void bthost_debug_print(void)
 {
 	uint32_t i = 0;
-	int32_t ret = 0;
-	uint8_t *pos = NULL, *end = NULL;
-	uint8_t dump_buffer[700] = {0};
-
-	pos = &dump_buffer[0];
-	end = pos + 700 - 1;
-
-	ret = snprintf(pos, (end - pos + 1), "[bt host info] ");
-	if (ret < 0)
-		BT_LOG_PRT_ERR("%s: snprintf fail ret[%d]", __func__, ret);
-	else
-		pos += ret;
-
-	for (i = 0; i < BTHOST_INFO_MAX; i++) {
-		if (bthost_info_table[i].id == 0) {
-			ret = snprintf(pos, (end - pos + 1),"[%d-%d] not set", i, BTHOST_INFO_MAX);
-			if (ret < 0 || ret >= (end - pos + 1)) {
-				BT_LOG_PRT_ERR("%s: snprintf fail i[%d] ret[%d]", __func__, i, ret);
-				break;
-			}
-			pos += ret;
+	for (i = 0; i < BTHOST_INFO_MAX; i++){
+		if (bthost_info_table[i].id == 0){
+			BT_LOG_PRT_WARN("[bt host info][%d-%d] not set", i, BTHOST_INFO_MAX);
 			break;
-		} else {
-			ret = snprintf(pos, (end - pos + 1),"[%d][%s : 0x%08x] ", i,
+		}
+		else {
+			BT_LOG_PRT_WARN("[bt host info][%d][%s : 0x%08x]", i,
 			bthost_info_table[i].desc,
 			bthost_info_table[i].value);
-			if (ret < 0 || ret >= (end - pos + 1)) {
-				BT_LOG_PRT_ERR("%s: snprintf fail i[%d] ret[%d]", __func__, i, ret);
-				break;
-			}
-			pos += ret;
 		}
 	}
-	BT_LOG_PRT_WARN("%s", dump_buffer);
 }
 
 void bthost_debug_save(uint32_t id, uint32_t value, char* desc)
@@ -180,7 +157,7 @@ void bthost_debug_save(uint32_t id, uint32_t value, char* desc)
 
 static INT32 ftrace_print(const PINT8 str, ...)
 {
-#ifdef BT_CONFIG_TRACING
+#ifdef CONFIG_TRACING
 	va_list args;
 	int ret = 0;
 	INT8 temp_string[FTRACE_STR_LOG_SIZE];
@@ -244,12 +221,10 @@ static int bt_fb_notifier_callback(struct notifier_block
 	switch (blank) {
 	case FB_BLANK_UNBLANK:
 	case FB_BLANK_POWERDOWN:
-#if (ENABLE_LOW_POWER_DEBUG == 1)
 		if(btonflag == 1 && rstflag == 0) {
 			BT_LOG_PRT_INFO("blank state [%ld]", blank);
 			bt_read_cr("HOST_MAILBOX_BT_ADDR", 0x18007124);
 		}
-#endif
 		break;
 	default:
 		break;
@@ -287,14 +262,12 @@ static int bt_pm_notifier_callback(struct notifier_block *nb,
 	switch (event) {
 		case PM_SUSPEND_PREPARE:
 		case PM_POST_SUSPEND:
-#if (ENABLE_LOW_POWER_DEBUG == 1)
 			if(btonflag == 1 && rstflag == 0) {
 				// for fw debug power issue
 				bt_read_cr("HOST_MAILBOX_BT_ADDR", 0x18007124);
 
 				bthost_debug_print();
 			}
-#endif
 			break;
 		default:
 			break;
@@ -755,7 +728,7 @@ static void pm_qos_set_feature(void)
 		rc = of_property_read_u32(node, DTS_QOS_KEY, &pm_qos_support);
 		if (!rc)
 			BT_LOG_PRT_ERR("get property[%s] fail!\n", DTS_QOS_KEY);
-	} else
+	} else 
 		BT_LOG_PRT_ERR("get dts[mediatek,bt] fail!\n");
 
 	BT_LOG_PRT_INFO("property[%s] = %d\n", DTS_QOS_KEY, pm_qos_support);
@@ -774,11 +747,8 @@ static void pm_qos_release(struct work_struct *pwork)
 
 static int BT_open(struct inode *inode, struct file *file)
 {
-	down(&bt_on_mtx);
-
 	if(btonflag) {
 		BT_LOG_PRT_WARN("BT already on!\n");
-		up(&bt_on_mtx);
 		return -EIO;
 	}
 
@@ -789,13 +759,10 @@ static int BT_open(struct inode *inode, struct file *file)
 	/* Turn on BT */
 	if (mtk_wcn_wmt_func_on(WMTDRV_TYPE_BT) == MTK_WCN_BOOL_FALSE) {
 		BT_LOG_PRT_WARN("WMT turn on BT fail!\n");
-		up(&bt_on_mtx);
 		return -EIO;
 	}
 
 	BT_LOG_PRT_INFO("WMT turn on BT OK!\n");
-
-	up(&bt_on_mtx);
 
 	if (mtk_wcn_stp_is_ready() == MTK_WCN_BOOL_FALSE) {
 
@@ -960,8 +927,6 @@ static int BT_init(void)
 	fw_log_bt_init();
 #endif
 	bt_dev_dbg_init();
-
-	sema_init(&bt_on_mtx, 1);
 
 	pm_qos_set_feature();
 	if(pm_qos_support) {

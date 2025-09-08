@@ -76,9 +76,7 @@ static int bt_dbg_fpga_test(int par1, int par2, int par3);
 static int bt_dbg_is_adie_work(int par1, int par2, int par3);
 static int bt_dbg_met_start_stop(int par1, int par2, int par3);
 static int bt_dbg_DynamicAdjustTxPower(int par1, int par2, int par3);
-#if (BUILD_QA_DBG == 1)
 static void bt_dbg_user_trx_proc(char *cmd_raw);
-#endif
 static int bt_dbg_user_trx_cb(uint8_t *buf, int len);
 static int bt_dbg_trace_pt(int par1, int par2, int par3);
 
@@ -99,9 +97,7 @@ static struct mutex g_bt_lock;
 static char g_bt_dump_buf[BT_DBG_DUMP_BUF_SIZE];
 static char *g_bt_dump_buf_ptr;
 static int g_bt_dump_buf_len;
-#if (BUILD_QA_DBG == 1)
 static bool g_bt_dbg_enable = FALSE;
-#endif
 
 static const tBT_DEV_DBG_STRUCT bt_dev_dbg_struct[] = {
 	[0x0] = {bt_dbg_hwver_get, 				FALSE},
@@ -206,10 +202,6 @@ int bt_dbg_reg_read(int par1, int par2, int par3)
 /* Write BGF SYS address (controller view) by 0x18001104 & 0x18900000 */
 int bt_dbg_reg_write(int par1, int par2, int par3)
 {
-#if 0
-#if (CFG_BT_ATF_SUPPORT == 1)
-	SendAtfSmcCmd_dbg_write(SMC_BT_DBG_REG_WRITE, par2, par3);
-#else
 	uint32_t *dynamic_remap_addr = NULL;
 	uint32_t *dynamic_remap_value = NULL;
 
@@ -232,17 +224,12 @@ int bt_dbg_reg_write(int par1, int par2, int par3)
 		return -1;
 	}
 	iounmap(dynamic_remap_value);
-#endif
-#endif
 	return 0;
 
 }
 
 int bt_dbg_ap_reg_read(int par1, int par2, int par3)
 {
-#if (BUILD_QA_DBG == 0)
-	return -ENODEV;
-#else
 	uint32_t *remap_addr = NULL;
 	int ret_val = 0;
 
@@ -257,15 +244,10 @@ int bt_dbg_ap_reg_read(int par1, int par2, int par3)
 	BTMTK_INFO("%s: 0x%08x read value = [0x%08x]", __func__, par2, ret_val);
 	iounmap(remap_addr);
 	return ret_val;
-#endif
 }
 
 int bt_dbg_ap_reg_write(int par1, int par2, int par3)
 {
-#if 0
-#if (CFG_BT_ATF_SUPPORT == 1)
-        SendAtfSmcCmd_dbg_write(SMC_BT_DBG_AP_REG_WRITE, par2, par3);
-#else
 	uint32_t *remap_addr = NULL;
 
 	/* TODO: */
@@ -278,8 +260,6 @@ int bt_dbg_ap_reg_write(int par1, int par2, int par3)
 	*remap_addr = par3;
 	BTMTK_INFO("%s: 0x%08x write value = [0x%08x]", __func__, par2, par3);
 	iounmap(remap_addr);
-#endif
-#endif
 	return 0;
 }
 
@@ -582,9 +562,6 @@ int bt_dbg_rx_buf_control(int par1, int par2, int par3)
 
 ssize_t bt_dbg_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
-#if (BUILD_QA_DBG == 0)
-	return -ENODEV;
-#else
 	int ret = 0;
 	int dump_len;
 
@@ -619,7 +596,6 @@ exit:
 
 	mutex_unlock(&g_bt_lock);
 	return ret;
-#endif
 }
 
 int bt_osal_strtol(const char *str, unsigned int adecimal, long *res)
@@ -656,7 +632,6 @@ end:
 	return 0;
 }
 
-#if (BUILD_QA_DBG == 1)
 void bt_dbg_user_trx_proc(char *cmd_raw)
 {
 #define LEN_64 64
@@ -684,13 +659,9 @@ void bt_dbg_user_trx_proc(char *cmd_raw)
 	// Send command and wait for command_complete event
 	btmtk_btif_internal_trx(hci_cmd, len, bt_dbg_user_trx_cb, TRUE, TRUE);
 }
-#endif
 
 ssize_t bt_dbg_write(struct file *filp, const char __user *buffer, size_t count, loff_t *f_pos)
 {
-#if (BUILD_QA_DBG == 0)
-	return -ENODEV;
-#else
 	bool is_passwd = FALSE, is_turn_on = FALSE;
 	size_t len = count;
 	char buf[256], *pBuf;
@@ -713,8 +684,8 @@ ssize_t bt_dbg_write(struct file *filp, const char __user *buffer, size_t count,
 	if (copy_from_user(buf, buffer, len))
 		return -EFAULT;
 	buf[len] = '\0';
-	BTMTK_INFO("%s: bt_state[%d], dbg_enable[%d], len[%d]",
-		__func__, bt_state, g_bt_dbg_enable, (int)len);
+	BTMTK_INFO("%s: bt_state[%d], dbg_enable[%d], len[%d], data = %s",
+		__func__, bt_state, g_bt_dbg_enable, (int)len, buf);
 
 	/* Check debug function is enabled or not
 	 *   - not enable yet: user should enable it
@@ -760,7 +731,7 @@ ssize_t bt_dbg_write(struct file *filp, const char __user *buffer, size_t count,
 	if (pToken != NULL) {
 		bt_osal_strtol(pToken, 16, &res);
 		y = (int)res;
-		BTMTK_INFO("%s: y = 0x%08x", __func__, y);
+		BTMTK_INFO("%s: y = 0x%08x\n\r", __func__, y);
 	} else {
 		y = 3000;
 		/*efuse, register read write default value */
@@ -791,7 +762,6 @@ ssize_t bt_dbg_write(struct file *filp, const char __user *buffer, size_t count,
 	}
 
 	return len;
-#endif
 }
 
 int bt_dev_dbg_init(void)
@@ -865,7 +835,7 @@ void bthost_debug_init(void)
 void bthost_debug_print(void)
 {
 	uint32_t i = 0;
-	int32_t ret = 0;
+	uint32_t ret = 0;
 	uint8_t *pos = NULL, *end = NULL;
 	uint8_t dump_buffer[700]={0};
 
@@ -873,11 +843,7 @@ void bthost_debug_print(void)
 	end = pos + 700 - 1;
 
 	ret = snprintf(pos, (end - pos + 1), "[bt host info] ");
-	if (ret < 0 || ret >= (end - pos + 1)) {
-		BTMTK_ERR("snprintf [bt host info] fail");
-	} else {
-		pos += ret;
-	}
+	pos += ret;
 
 	for (i = 0; i < BTHOST_INFO_MAX; i++){
 		if (bthost_info_table[i].id == 0){
