@@ -89,7 +89,9 @@ int gFwLogOnOffStatus;	/* 0: default, 1: success, -1: fail */
 #endif
 
 typedef void (*wifi_fwlog_event_func_cb)(int, int);
+typedef void (*wifi_fwlog_get_fw_ver_func_cb)(uint8_t*, uint32_t*, uint32_t);
 wifi_fwlog_event_func_cb pfFwEventFuncCB;
+wifi_fwlog_get_fw_ver_func_cb pfFwGetFwVerCB;
 static wait_queue_head_t wq;
 
 #if (CFG_ANDORID_CONNINFRA_SUPPORT == 1)
