@@ -235,7 +235,7 @@ static void power_reset(void)
 {
 	int status = -EINVAL;
 	status = regulator_get_voltage(buck);
-	pr_info("%s, voltage before power down is %d\n", __func__, status);
+	pr_debug("%s, voltage before power down is %d\n", __func__, status);
 
 	/* power down */
 	status = regulator_disable(buck);
@@ -287,7 +287,7 @@ static ssize_t power_ctrl_set(struct device *device,
 	}
 	voltage = regulator_get_voltage(buck);
 	enabled = regulator_is_enabled(buck);
-	pr_info("%s, get cmd:%s, status:%d, enabled:%d cur voltage:%d\n", __func__, buf, status, enabled, voltage);
+	pr_debug("%s, get cmd:%s, status:%d, enabled:%d cur voltage:%d\n", __func__, buf, status, enabled, voltage);
 	return status ? status : count;
 }
 static DEVICE_ATTR(power_ctrl, S_IWUSR, power_ctrl_get, power_ctrl_set);
@@ -485,7 +485,7 @@ static const struct attribute_group attribute_group = {
 #ifndef FPC_DRM_INTERFACE_WA
 static void notification_work(struct work_struct *work)
 {
-	pr_info("%s: fpc fp unblank\n", __func__);
+	pr_debug("%s: fpc fp unblank\n", __func__);
 	mtk_drm_early_resume(FP_UNLOCK_REJECTION_TIMEOUT);
 	//mtk_dsi_enable_ext_interface(FP_UNLOCK_REJECTION_TIMEOUT);
 }
@@ -509,7 +509,7 @@ static irqreturn_t fpc1022_irq_handler(int irq, void *handle)
 	sysfs_notify(&fpc1022->dev->kobj, NULL, dev_attr_irq.attr.name);
 
 	if (fpc1022->wait_finger_down && fpc1022->fb_black) {
-		pr_info("%s enter fingerdown & fb_black then schedule_work\n", __func__);
+		pr_debug("%s enter fingerdown & fb_black then schedule_work\n", __func__);
 		fpc1022->wait_finger_down = false;
 		#ifndef FPC_DRM_INTERFACE_WA
 		schedule_work(&fpc1022->work);
@@ -535,20 +535,20 @@ static int fpc_fb_notif_callback(struct notifier_block *nb,
 	if (event != MI_DISP_DPMS_EVENT)
 		return 0;
 
-	pr_info("[info] %s value = %d blank = %d\n", __func__, (int)event, blank = *(int *)(evdata->data));
+	pr_debug("[info] %s value = %d blank = %d\n", __func__, (int)event, blank = *(int *)(evdata->data));
 
 	if (evdata && evdata->data && event == MI_DISP_DPMS_EVENT) {
 		blank = *(int *)(evdata->data);
 		switch (blank) {
 			case MI_DISP_DPMS_POWERDOWN:
-				pr_info("[info] %s lcd off notify\n", __func__);
+				pr_debug("[info] %s lcd off notify\n", __func__);
 				mutex_lock(&fpc1022->fb_lock);
 				fpc1022->fb_black = true;
 				mutex_unlock(&fpc1022->fb_lock);
 				sysfs_notify(&fpc1022->dev->kobj, NULL, dev_attr_screen.attr.name);
 				break;
 			case MI_DISP_DPMS_ON:
-				pr_info("[info] %s lcd on notify\n", __func__);
+				pr_debug("[info] %s lcd on notify\n", __func__);
 				mutex_lock(&fpc1022->fb_lock);
 				fpc1022->fb_black = false;
 				mutex_unlock(&fpc1022->fb_lock);
