@@ -14,6 +14,7 @@
 #include <linux/uidgid.h>
 #include <uapi/linux/android/binderfs.h>
 #include "binder_alloc.h"
+#include "dbitmap.h"
 
 struct binder_context {
 	struct binder_node *binder_context_mgr_node;
@@ -448,7 +449,6 @@ struct binder_proc {
 	bool sync_recv;
 	bool async_recv;
 	wait_queue_head_t freeze_wait;
-
 	struct list_head todo;
 	struct binder_stats stats;
 	struct list_head delivered_death;
@@ -475,15 +475,20 @@ struct binder_proc {
  * @delivered_freeze:     list of delivered freeze notification
  *                        (protected by @inner_lock)
  * @lock:            protects binder_alloc fields
+ * @dmap             dbitmap to manage available reference descriptors
+ *                   (protected by @proc.outer_lock)
  *
  * Extended binder_proc -- needed to add the "cred" and "lock" field
  * without changing the KMI for binder_proc.
+ * Extended binder_proc -- needed to add the "dmap" field without
+ * changing the KMI for binder_proc.
  */
 struct binder_proc_ext {
 	struct binder_proc proc;
 	const struct cred *cred;
 	struct list_head delivered_freeze;
 	spinlock_t lock;
+	struct dbitmap dmap;
 };
 
 static inline struct binder_proc *

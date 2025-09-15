@@ -1669,9 +1669,11 @@
 /* 1(default): Run on big core when tput over threshold
  * 0: Disable (Let system scheduler decide)
  */
-#define CFG_SUPPORT_TPUT_ON_BIG_CORE 1
+#define CFG_SUPPORT_TPUT_ON_BIG_CORE 0
 
 #define CFG_SUPPORT_LITTLE_CPU_BOOST 0
+
+#define CFG_SUPPORT_CPU_BOOST 0
 
 #define CFG_SUPPORT_ANDROID_DUAL_STA 0
 

@@ -1331,21 +1331,16 @@ static int inode_doinit_use_xattr(struct inode *inode, struct dentry *dentry,
 				  u32 def_sid, u32 *sid)
 {
 #define INITCONTEXTLEN 255
-	char *context;
+	char context_onstack[INITCONTEXTLEN + 1] __aligned(sizeof(long));
+	char *context = context_onstack;
 	unsigned int len;
 	int rc;
 
 	len = INITCONTEXTLEN;
-	context = kmalloc(len + 1, GFP_NOFS);
-	if (!context)
-		return -ENOMEM;
-
 	context[len] = '\0';
 	rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX, context, len,
 			    XATTR_NOSECURITY);
 	if (rc == -ERANGE) {
-		kfree(context);
-
 		/* Need a larger buffer.  Query for the right size. */
 		rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX, NULL, 0,
 				    XATTR_NOSECURITY);
@@ -1362,7 +1357,8 @@ static int inode_doinit_use_xattr(struct inode *inode, struct dentry *dentry,
 				    context, len, XATTR_NOSECURITY);
 	}
 	if (rc < 0) {
-		kfree(context);
+		if (context != context_onstack)
+			kfree(context);
 		if (rc != -ENODATA) {
 			pr_warn("SELinux: %s:  getxattr returned %d for dev=%s ino=%ld\n",
 				__func__, -rc, inode->i_sb->s_id, inode->i_ino);
@@ -1386,7 +1382,8 @@ static int inode_doinit_use_xattr(struct inode *inode, struct dentry *dentry,
 				__func__, context, -rc, dev, ino);
 		}
 	}
-	kfree(context);
+	if (context != context_onstack)
+		kfree(context);
 	return 0;
 }
 
@@ -5234,17 +5231,15 @@ out:
 
 static int selinux_sk_alloc_security(struct sock *sk, int family, gfp_t priority)
 {
-	struct sk_security_struct *sksec;
+	struct sk_security_struct *sksec = sk->sk_security;
 
-	sksec = kzalloc(sizeof(*sksec), priority);
-	if (!sksec)
-		return -ENOMEM;
-
+#ifdef CONFIG_NETLABEL
+	memset(sksec, 0, offsetof(struct sk_security_struct, sid));
+#endif
 	sksec->peer_sid = SECINITSID_UNLABELED;
 	sksec->sid = SECINITSID_UNLABELED;
 	sksec->sclass = SECCLASS_SOCKET;
 	selinux_netlbl_sk_security_reset(sksec);
-	sk->sk_security = sksec;
 
 	return 0;
 }
@@ -5253,14 +5248,12 @@ static void selinux_sk_free_security(struct sock *sk)
 {
 	struct sk_security_struct *sksec = sk->sk_security;
 
-	sk->sk_security = NULL;
 	selinux_netlbl_sk_security_free(sksec);
-	kfree(sksec);
 }
 
 static void selinux_sk_clone_security(const struct sock *sk, struct sock *newsk)
 {
-	struct sk_security_struct *sksec = sk->sk_security;
+	const struct sk_security_struct *sksec = sk->sk_security;
 	struct sk_security_struct *newsksec = newsk->sk_security;
 
 	newsksec->sid = sksec->sid;
@@ -5469,7 +5462,7 @@ static void selinux_sctp_sk_clone(struct sctp_endpoint *ep, struct sock *sk,
 static int selinux_inet_conn_request(struct sock *sk, struct sk_buff *skb,
 				     struct request_sock *req)
 {
-	struct sk_security_struct *sksec = sk->sk_security;
+	const struct sk_security_struct *sksec = sk->sk_security;
 	int err;
 	u16 family = req->rsk_ops->family;
 	u32 connsid;

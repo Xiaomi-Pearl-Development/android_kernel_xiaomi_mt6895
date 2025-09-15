@@ -37,7 +37,7 @@ enum {
 	BINDER_DEBUG_BUFFER_ALLOC           = 1U << 2,
 	BINDER_DEBUG_BUFFER_ALLOC_ASYNC     = 1U << 3,
 };
-static uint32_t binder_alloc_debug_mask = BINDER_DEBUG_USER_ERROR;
+static uint32_t binder_alloc_debug_mask = 0;
 
 module_param_named(debug_mask, binder_alloc_debug_mask,
 		   uint, 0644);
@@ -940,7 +940,6 @@ void binder_alloc_deferred_release(struct binder_alloc *alloc)
 		int i;
 
 		for (i = 0; i < alloc->buffer_size / PAGE_SIZE; i++) {
-			unsigned long page_addr;
 			bool on_lru;
 
 			if (!alloc->pages[i].page_ptr)
@@ -948,7 +947,6 @@ void binder_alloc_deferred_release(struct binder_alloc *alloc)
 
 			on_lru = list_lru_del(&binder_freelist,
 					      &alloc->pages[i].lru);
-			page_addr = (uintptr_t)alloc->buffer + i * PAGE_SIZE;
 			binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
 				     "%s: %d: page %d %s\n",
 				     __func__, alloc->pid, i,
@@ -956,9 +954,9 @@ void binder_alloc_deferred_release(struct binder_alloc *alloc)
 			__free_page(alloc->pages[i].page_ptr);
 			page_count++;
 		}
-		kvfree(alloc->pages);
 	}
 	binder_alloc_unlock(alloc);
+	kvfree(alloc->pages);
 	if (alloc->vma_vm_mm)
 		mmdrop(alloc->vma_vm_mm);
 
@@ -984,7 +982,7 @@ void binder_alloc_print_allocated(struct seq_file *m,
 	binder_alloc_lock(alloc);
 	for (n = rb_first(&alloc->allocated_buffers); n; n = rb_next(n)) {
 		buffer = rb_entry(n, struct binder_buffer, rb_node);
-		seq_printf(m, "  buffer %d: %lx size %zd:%zd:%zd %s\n",
+		seq_printf(m, "  buffer %d: %tx size %zd:%zd:%zd %s\n",
 			   buffer->debug_id,
 			   buffer->user_data - alloc->buffer,
 			   buffer->data_size, buffer->offsets_size,
@@ -1271,6 +1269,21 @@ static int binder_alloc_do_buffer_copy(struct binder_alloc *alloc,
 				       void *ptr,
 				       size_t bytes)
 {
+	if (unlikely(!alloc)) {
+		pr_crit("binder: binder_alloc_do_buffer_copy: alloc is NULL! buffer=%px ptr=%px bytes=%zu\n",
+			buffer, ptr, bytes);
+		dump_stack();
+		WARN_ON(1);
+		return -EFAULT;
+	}
+	if (unlikely(!buffer)) {
+		pr_crit("binder: binder_alloc_do_buffer_copy: buffer is NULL! alloc=%px ptr=%px bytes=%zu\n",
+			alloc, ptr, bytes);
+		dump_stack();
+		WARN_ON(1);
+		return -EFAULT;
+	}
+
 	/* All copies must be 32-bit aligned and 32-bit size */
 	if (!check_buffer(alloc, buffer, buffer_offset, bytes))
 		return -EINVAL;
@@ -1284,8 +1297,23 @@ static int binder_alloc_do_buffer_copy(struct binder_alloc *alloc,
 
 		page = binder_alloc_get_page(alloc, buffer,
 					     buffer_offset, &pgoff);
+		if (unlikely(!page)) {
+			pr_crit("binder: binder_alloc_get_page returned NULL page! alloc=%px buffer=%px offset=%lld\n",
+				alloc, buffer, (long long)buffer_offset);
+			dump_stack();
+			WARN_ON(1);
+			return -EFAULT;
+		}
+
 		size = min_t(size_t, bytes, PAGE_SIZE - pgoff);
 		base_ptr = kmap_atomic(page);
+		if (unlikely(!base_ptr)) {
+			pr_crit("binder: kmap_atomic failed for page %p! alloc=%px buffer=%px offset=%lld\n",
+				page, alloc, buffer, (long long)buffer_offset);
+			dump_stack();
+			WARN_ON(1);
+			return -ENOMEM;
+		}
 		tmpptr = base_ptr + pgoff;
 		if (to_buffer)
 			memcpy(tmpptr, ptr, size);
